@@ -836,66 +836,128 @@ const syncOnlineAction = async (newPlayers, newLogs) => {
 }; // 這裡才正確閉合函式
 
         // Shared Bot Logic
-        const simulateFullBotTurn = (botPlayer, allPlayers, currentLogs) => {
-            let b = { ...botPlayer };
-            let players = JSON.parse(JSON.stringify(allPlayers));
-            let logs = [...currentLogs];
-            let actionsDone = 0;
+// Shared Bot Logic (增強版)
+const simulateFullBotTurn = (botPlayer, allPlayers, currentLogs) => {
+    let b = { ...botPlayer };
+    let players = JSON.parse(JSON.stringify(allPlayers));
+    let logs = [...currentLogs];
+    let actionsLeft = 3;   // 使用獨立變數，避免影響外部 gameState
 
-            logs = addLog(logs, `🤖 ${b.name} 正在思考策略...`);
+    logs = addLog(logs, `🤖 ${b.name} 正在分析局勢...`);
 
-            while (b.drawCountThisTurn < 3 && (b.policyCards + b.challengeCards < 3) && actionsDone < 3) {
-                const isPolicy = Math.random() > 0.5;
-                if (isPolicy) b.policyCards++; else b.challengeCards++;
-                b.drawCountThisTurn++;
-                logs = addLog(logs, `🃏 ${b.name} 消耗 1 行動點抽卡 (本回合已抽: ${b.drawCountThisTurn}/3)。`);
-                actionsDone++;
+    // 輔助函式：挑選最佳攻擊目標
+    const selectTarget = () => {
+        // 只挑選壓力 < PI_LIMIT 的對手，避免攻擊已經爆煲的玩家（雖然爆煲後仍可攻擊，但效益較低）
+        const candidates = players
+            .map((p, idx) => ({ ...p, idx }))
+            .filter(p => p.id !== b.id && p.pressure < PI_LIMIT);
+        if (candidates.length === 0) {
+            // 若所有對手壓力都 >= PI_LIMIT，則隨機挑一位（仍可攻擊）
+            const allOpponents = players
+                .map((p, idx) => ({ ...p, idx }))
+                .filter(p => p.id !== b.id);
+            if (allOpponents.length === 0) return null;
+            return allOpponents[Math.floor(Math.random() * allOpponents.length)];
+        }
+        // 依金錢降序排序，挑最有錢的對手攻擊
+        candidates.sort((a, b) => b.money - a.money);
+        return candidates[0];
+    };
+
+    // 主要行動循環
+    while (actionsLeft > 0) {
+        // ---- 第一優先：壓力 >= 120 且持有政策卡，立即使用 ----
+        if (b.pressure >= 120 && b.policyCards > 0) {
+            b.policyCards--;
+            b.pressure = Math.max(0, b.pressure - 20);
+            logs = addLog(logs, `🛡️ ${b.name} 緊急實施政策，壓力 -20！`);
+            actionsLeft--;
+            continue;
+        }
+
+        // ---- 第二優先：持有挑戰卡且存在合適目標，攻擊金錢最高的對手 ----
+        if (b.challengeCards > 0) {
+            const target = selectTarget();
+            if (target) {
+                players[target.idx].pressure += 20;
+                b.challengeCards--;
+                logs = addLog(logs, `⚔️ ${b.name} 對 ${target.name} 發起挑戰，對方壓力 +20！`);
+                actionsLeft--;
+                continue;
             }
-            if (b.pressure >= 100 && b.policyCards > 0 && actionsDone < 3) {
-                b.policyCards--;
-                b.pressure = Math.max(0, b.pressure - 20);
-                logs = addLog(logs, `🛡️ ${b.name} 實施政策，緊急消減承載力壓力 (-20 PI)。`);
-                actionsDone++;
-            }
-            if (b.infraBuilt < 5 && actionsDone < 3) {
-                b.infraBuilt++;
-                logs = addLog(logs, `🏗️ ${b.name} 建設了 1 個基礎建設。`);
-                actionsDone++;
-            }
-            if (b.attrBuilt < 5 && actionsDone < 3) {
-                b.attrBuilt++;
-                logs = addLog(logs, `🎢 ${b.name} 開發了 1 個旅遊景點。`);
-                actionsDone++;
-            }
-            if (b.challengeCards > 0 && actionsDone < 3) {
-                const opponents = players.filter(p => p.id !== b.id);
-                if (opponents.length > 0) {
-                    const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
-                    const targetIndex = players.findIndex(p => p.id === randomOpponent.id);
-                    players[targetIndex].pressure += 20;
-                    b.challengeCards--;
-                    logs = addLog(logs, `⚔️ ${b.name} 對 ${randomOpponent.name} 發起挑戰，使其 PI +20！`);
-                    actionsDone++;
-                }
+        }
+
+        // ---- 第三優先：基礎建設未滿 ----
+        if (b.infraBuilt < 5) {
+            b.infraBuilt++;
+            logs = addLog(logs, `🏗️ ${b.name} 建設基礎建設 (${b.infraBuilt}/5)。`);
+            actionsLeft--;
+            continue;
+        }
+
+        // ---- 第四優先：旅遊景點未滿 ----
+        if (b.attrBuilt < 5) {
+            b.attrBuilt++;
+            logs = addLog(logs, `🎢 ${b.name} 開發旅遊景點 (${b.attrBuilt}/5)。`);
+            actionsLeft--;
+            continue;
+        }
+
+        // ---- 第五優先：抽卡 (若還有抽卡次數) ----
+        if (b.drawCountThisTurn < 3 && (b.policyCards + b.challengeCards) < 3) {
+            // 根據需求決定抽卡傾向
+            let needPolicy = (b.pressure > 80 && b.policyCards < 2);   // 壓力高且政策卡少
+            let needChallenge = false;
+            if (!needPolicy) {
+                // 若有對手金錢 > 120，且自己挑戰卡 < 2，則傾向抽挑戰卡
+                const richOpponent = players.some(
+                    p => p.id !== b.id && p.money >= 120 && p.pressure < PI_LIMIT
+                );
+                if (richOpponent && b.challengeCards < 2) needChallenge = true;
             }
 
-            b.stage = getCalculatedStage(b.infraBuilt, b.attrBuilt);
-            const myIndex = players.findIndex(p => p.id === b.id);
-            players[myIndex] = b;
+            // 隨機抽卡，但依照需求調整機率
+            let policyProb = 0.5;
+            if (needPolicy) policyProb = 0.8;
+            else if (needChallenge) policyProb = 0.3;
 
-            let newEndRound = false;
-            if (b.pressure >= PI_LIMIT) {
-                const boomResult = handleBoom(b);
-                players[myIndex] = boomResult.player;
-                logs = addLog(logs, boomResult.log);
+            const isPolicy = Math.random() < policyProb;
+            if (isPolicy) {
+                b.policyCards++;
             } else {
-                if (b.money >= 150 && !gameState.triggerEndRound) {
-                    newEndRound = true;
-                    logs = addLog(logs, `🚨 【終局提示】${b.name} 成功賺得 $${b.money} (且未爆煲)！觸發「最後一輪」！其餘玩家有最後一回合可以反擊！`);
-                }
+                b.challengeCards++;
             }
-            return { players, logs, newEndRound };
-        };
+            b.drawCountThisTurn++;
+            const cardName = isPolicy ? '政策卡' : '挑戰卡';
+            logs = addLog(logs, `🃏 ${b.name} 抽到 ${cardName} (已抽 ${b.drawCountThisTurn}/3)。`);
+            actionsLeft--;
+            continue;
+        }
+
+        // 若所有行動都無法執行（理論上不應發生），強制結束
+        break;
+    }
+
+    // 更新階段
+    b.stage = getCalculatedStage(b.infraBuilt, b.attrBuilt);
+    const myIndex = players.findIndex(p => p.id === b.id);
+    players[myIndex] = b;
+
+    // 爆煲檢查
+    let newEndRound = false;
+    if (b.pressure >= PI_LIMIT) {
+        const boomResult = handleBoom(b);
+        players[myIndex] = boomResult.player;
+        logs = addLog(logs, boomResult.log);
+    } else {
+        if (b.money >= 150 && !gameState.triggerEndRound) {
+            newEndRound = true;
+            logs = addLog(logs, `🚨 【終局提示】${b.name} 成功賺得 $${b.money} (且未爆煲)！觸發「最後一輪」！`);
+        }
+    }
+
+    return { players, logs, newEndRound };
+};
         // 更新排行榜（僅線上模式，真人玩家）
         const updateLeaderboard = async (player) => {
             if (!fbDb || !player.uid || player.isBot) return;
