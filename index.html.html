@@ -1,0 +1,1201 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>旅遊天秤</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .hidden { display: none !important; }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #1e293b; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #64748b; }
+
+        /* 爆煲臨界 紅色閃爍特效 */
+        @keyframes red-flash {
+            0%, 100% { border-color: #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.6); }
+            50% { border-color: #b91c1c; box-shadow: 0 0 25px rgba(185, 28, 28, 0.9); }
+        }
+        .animate-red-flash {
+            animation: red-flash 0.8s infinite;
+        }
+
+        /* 資金破百 黃金大亨閃爍特效 */
+        @keyframes yellow-flash {
+            0%, 100% { border-color: #eab308; box-shadow: 0 0 8px rgba(234, 179, 8, 0.5); }
+            50% { border-color: #ca8a04; box-shadow: 0 0 25px rgba(202, 138, 4, 0.9); }
+        }
+        .animate-yellow-flash {
+            animation: yellow-flash 1.2s infinite;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen">
+
+    <!-- Screen 1: Setup Page -->
+    <div id="screen-setup" class="min-h-screen p-4 md:p-12 bg-slate-50 flex items-center justify-center">
+        <div class="max-w-4xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+            <div class="bg-teal-800 p-6 md:p-8 text-center text-white">
+                <h1 class="text-3xl md:text-4xl font-extrabold mb-2"><i class="fa-solid fa-scale-balanced mr-2"></i>旅遊天秤</h1>
+                <p class="text-teal-100 text-sm md:text-base">旅款科模擬遊戲 - 學習目的地生命週期、旅客分類及承載力</p>
+            </div>
+            
+            <div class="p-6 md:p-8">
+                <!-- Mode Selector Tabs -->
+                <div class="flex flex-col md:flex-row border-b border-slate-200 mb-8">
+                    <button id="tab-ai" onclick="window.gameAPI.setMode('ai')" class="flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-teal-600 text-teal-700 transition">
+                        <i class="fa-solid fa-robot mr-2"></i>單人與 AI 對戰
+                    </button>
+                    <button id="tab-local" onclick="window.gameAPI.setMode('local')" class="flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-transparent text-slate-500 hover:text-slate-700 transition">
+                        <i class="fa-solid fa-users mr-2"></i>4人本地對戰
+                    </button>
+                    <button id="tab-online" onclick="window.gameAPI.setMode('online')" class="flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-transparent text-slate-500 hover:text-slate-700 transition relative">
+                        <i class="fa-solid fa-globe mr-2"></i>線上對戰模式
+                        <span class="absolute top-2 right-2 flex h-3 w-3">
+                            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-teal-400 opacity-75"></span>
+                            <span class="relative inline-flex rounded-full h-3 w-3 bg-teal-500"></span>
+                        </span>
+                    </button>
+                </div>
+
+                <!-- Input Forms & Panels -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- Left Column: Inputs & Rooms -->
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-700 mb-4 flex items-center gap-2">
+                            <i class="fa-solid fa-id-card text-teal-600"></i><span id="player-input-title">輸入玩家名字：</span>
+                        </h3>
+                        
+                        <!-- Player Names Container -->
+                        <div id="players-input-container" class="space-y-4">
+                            <div>
+                                <label class="block text-xs font-bold text-slate-500 mb-1">玩家 A（你）：</label>
+                                <input type="text" id="p1-name" value="玩家 A" class="w-full border-2 border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500 font-medium">
+                            </div>
+                            <div id="p2-container">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">玩家 B：</label>
+                                <input type="text" id="p2-name" value="AI局長 1號" disabled class="w-full border-2 border-slate-100 bg-slate-50 text-slate-400 rounded-lg px-4 py-2 font-medium">
+                            </div>
+                            <div id="p3-container">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">玩家 C：</label>
+                                <input type="text" id="p3-name" value="AI局長 2號" disabled class="w-full border-2 border-slate-100 bg-slate-50 text-slate-400 rounded-lg px-4 py-2 font-medium">
+                            </div>
+                            <div id="p4-container">
+                                <label class="block text-xs font-bold text-slate-500 mb-1">玩家 D：</label>
+                                <input type="text" id="p4-name" value="AI局長 3號" disabled class="w-full border-2 border-slate-100 bg-slate-50 text-slate-400 rounded-lg px-4 py-2 font-medium">
+                            </div>
+                        </div>
+
+                        <!-- Online Rooms Container (Hidden by default) -->
+                        <div id="online-rooms-container" class="hidden mt-6">
+                            <h4 class="text-sm font-bold text-slate-500 mb-2 border-t pt-4"><i class="fa-solid fa-door-open"></i> 選擇比賽房間 (連線中...)</h4>
+                            <div class="grid grid-cols-2 gap-3" id="rooms-grid">
+                                <!-- Rooms injected via JS -->
+                                <div class="col-span-2 text-center text-sm text-slate-400 py-4"><i class="fa-solid fa-spinner fa-spin"></i> 正在連線至伺服器...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rules Summary Card -->
+                    <div class="bg-amber-50/60 p-6 rounded-2xl border border-amber-200 text-slate-700 text-sm flex flex-col justify-between">
+                        <div>
+                            <h4 class="font-extrabold text-amber-800 text-lg mb-3 flex items-center gap-2">
+                                <i class="fa-solid fa-graduation-cap"></i>T&H 施政目標（整輪結束結算制）：
+                            </h4>
+                            <ul class="space-y-2 text-xs md:text-sm">
+                                <li><strong class="text-teal-700">🏆 經濟目標：</strong>玩家只要賺取 <strong class="text-yellow-600">$150</strong> 就會觸發「終局整輪結算期」，此時其餘玩家依然可以進行他們的最後回合！</li>
+                                <li><strong class="text-purple-700">⚖️ 公平判決：</strong>整輪結束後，所有PI安全（&lt; 150）且滿 $150 的玩家中，<strong class="text-yellow-600">金錢最高者勝出</strong>；若金錢相同，則 <strong class="text-emerald-700">PI 壓力最低者（可持續發展度最高）</strong>勝出！</li>
+                                <li><strong class="text-red-600">💥 承載力極限 (150 PI)：</strong>如果你的回合結束時，PI 依然達到或大於 <strong class="text-red-600">150 點</strong>，該地即時爆煲，觸發 50% 衰落或 50% 重生！</li>
+                                <li><strong class="text-emerald-700">🛡️ 自我救贖：</strong>PI 破百時仍可完整行動！在回合結束前，利用「政策卡」自救吧！每回合最多可**抽卡3次**，策略致勝！</li>
+                                <li id="rule-online-extra" class="hidden"><strong class="text-blue-600">🌐 線上模式：</strong>加入房間後若 30 秒未滿 4 人，系統將自動指派 AI 遞補！</li>
+                            </ul>
+                        </div>
+                        <button id="btn-start-local" onclick="window.gameAPI.startGame()" class="w-full mt-6 bg-teal-600 hover:bg-teal-700 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-teal-600/20 transition flex items-center justify-center gap-2 text-lg">
+                            <i class="fa-solid fa-play"></i> 開始發展目的地！
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 2: Online Lobby -->
+    <div id="screen-lobby" class="hidden min-h-screen p-4 md:p-12 bg-slate-50 flex items-center justify-center">
+        <div class="max-w-2xl w-full bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
+            <div class="bg-blue-800 p-8 text-center text-white relative">
+                <h2 class="text-3xl font-extrabold mb-2"><i class="fa-solid fa-satellite-dish animate-pulse mr-2"></i>等待大廳</h2>
+                <p class="text-blue-200">房號：<span id="lobby-room-id" class="font-mono font-bold text-white"></span></p>
+                <button onclick="window.gameAPI.leaveRoom()" class="absolute top-4 right-4 bg-blue-900/50 hover:bg-blue-900 px-3 py-1 rounded text-sm transition">離開</button>
+            </div>
+            
+            <div class="p-8">
+                <div class="text-center mb-8">
+                    <p class="text-slate-500 font-bold mb-2">距離自動開始填補 AI 還剩：</p>
+                    <div class="text-5xl font-black text-teal-600 font-mono" id="lobby-timer">30 秒</div>
+                </div>
+
+                <h3 class="font-bold text-slate-700 mb-4 border-b pb-2">已加入玩家：</h3>
+                <div id="lobby-players-list" class="space-y-3 mb-6">
+                    <!-- Injected via JS -->
+                </div>
+                
+                <p class="text-xs text-center text-slate-400 mt-6"><i class="fa-solid fa-circle-info"></i> 若 4 人提早滿員，遊戲將立即開始。首位加入者為房主，負責觸發 AI 遞補。</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 3: Game Board -->
+    <div id="screen-game" class="hidden min-h-screen bg-slate-800 text-slate-100 flex flex-col md:flex-row">
+        <!-- Sidebar -->
+        <div class="w-full md:w-1/4 bg-slate-900 border-r border-slate-700 flex flex-col h-auto md:h-screen sticky top-0">
+            <div class="p-4 border-b border-slate-700 flex justify-between items-center bg-slate-800">
+                <div>
+                    <h2 class="text-xl font-bold text-teal-400"><i class="fa-solid fa-scale-balanced"></i> 旅遊天秤控制中心</h2>
+                    <span class="text-xs bg-slate-700 px-2 py-1 rounded text-slate-300">目標: $150 經濟勝利</span>
+                </div>
+                <button onclick="window.gameAPI.exitToSetup()" class="text-slate-400 hover:text-white" title="重啟遊戲"><i class="fa-solid fa-arrow-rotate-left text-xl"></i></button>
+            </div>
+            
+            <!-- Info Panel -->
+            <div class="bg-slate-800 p-4 border-b border-slate-700">
+                <div class="text-xs font-bold text-teal-400 uppercase tracking-wider mb-2 flex items-center gap-1">
+                    <i class="fa-solid fa-circle-info"></i> 發展階段與旅客資訊
+                </div>
+                <div id="game-stage-info" class="space-y-1.5 text-xs">
+                    <!-- Injected via JS -->
+                </div>
+            </div>
+
+            <div class="bg-slate-800/80 px-4 py-2 border-b border-slate-700 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                歷史日誌 (最新置頂)
+            </div>
+
+            <!-- Logs -->
+            <div id="game-logs" class="flex-1 p-4 overflow-y-auto bg-slate-950 font-mono text-xs md:text-sm space-y-2 h-48 md:h-auto">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- Main Game Area -->
+        <div class="flex-1 p-4 overflow-y-auto h-screen md:h-auto">
+            <!-- Global Dashboard -->
+            <div id="game-global-dashboard" class="bg-slate-900 border border-slate-700 rounded-xl p-3 mb-6 flex flex-wrap gap-4 items-center shadow-lg">
+                <!-- Injected via JS -->
+            </div>
+
+            <!-- Winner Banner -->
+            <div id="game-winner-banner" class="hidden bg-yellow-500/20 border-2 border-yellow-500 text-yellow-300 p-6 rounded-xl mb-6 text-center shadow-lg shadow-yellow-500/20">
+                <h1 class="text-4xl font-black mb-2">🎉 遊戲結束 🎉</h1>
+                <p id="game-winner-name" class="text-xl mb-2">勝出者：</p>
+                <p id="game-winner-reason" class="text-sm text-yellow-100 opacity-90 mb-4"></p>
+                <button onclick="window.gameAPI.exitToSetup()" class="mt-2 bg-yellow-500 hover:bg-yellow-400 text-slate-950 font-bold px-6 py-2 rounded-lg">重新開始</button>
+            </div>
+
+            <!-- Custom Message Modal (Replaces unsafe window.alert) -->
+            <div id="custom-alert" class="hidden bg-red-600/20 border-2 border-red-500 text-red-200 p-4 rounded-xl mb-6 flex justify-between items-center shadow-md animate-pulse">
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-xl"></i>
+                    <span id="custom-alert-text" class="font-bold">提示訊息</span>
+                </div>
+                <button onclick="document.getElementById('custom-alert').classList.add('hidden')" class="bg-red-600 hover:bg-red-500 text-white font-bold px-3 py-1 rounded text-sm">確認</button>
+            </div>
+
+            <!-- Online Sync Alert -->
+            <div id="online-sync-alert" class="hidden bg-blue-600/20 border border-blue-500 text-blue-200 p-2 rounded-lg mb-4 text-xs flex justify-center items-center gap-2">
+                <i class="fa-solid fa-cloud-arrow-up animate-bounce"></i> <span>已連線，資料即時同步中...</span>
+            </div>
+
+            <!-- Active Turn Indicator -->
+            <div id="game-turn-indicator" class="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-700/50 p-4 rounded-xl border border-slate-600 shadow-md gap-4">
+                <div class="text-lg flex flex-wrap items-center gap-2">
+                    <span>目前回合:</span>
+                    <span id="game-active-player-name" class="font-bold text-teal-300 text-xl"></span>
+                    <span id="game-ai-thinking" class="hidden bg-slate-600 text-xs px-2 py-1 rounded-full animate-pulse">🤖 AI 思考中...</span>
+                    <span id="game-last-round-indicator" class="hidden bg-red-600/30 text-red-400 border border-red-500/50 text-xs px-2 py-1 rounded-full animate-pulse font-bold">⚠️ 終局最後一輪！</span>
+                </div>
+                <div id="game-my-turn-alert" class="hidden bg-teal-600 px-5 py-2 rounded-lg font-bold shadow-lg border border-teal-400 animate-bounce">
+                    👉 請行動！(剩餘行動: <span id="game-actions-left">3</span>/3)
+                </div>
+            </div>
+
+            <!-- Players Grid -->
+            <div id="game-players-grid" class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-20">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Game Script -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, onSnapshot, runTransaction } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const STAGES = {
+            1: { name: '發掘階段', req: 0, income: 10, pressure: 0, desc: '漫遊客' },
+            2: { name: '投入階段', req: 1, income: 20, pressure: 10, desc: '探險客' },
+            3: { name: '發展階段', req: 2, income: 30, pressure: 20, desc: '個別群體' },
+            4: { name: '鞏固階段', req: 3, income: 40, pressure: 30, desc: '旅行團' },
+            5: { name: '停滯階段', req: 4, income: 50, pressure: 40, desc: '大型團體' }
+        };
+
+        const PI_LIMIT = 150; 
+
+        const getCalculatedStage = (infra, attr) => {
+            if (infra >= 4 && attr >= 4) return 5;
+            if (infra >= 3 && attr >= 3) return 4;
+            if (infra >= 2 && attr >= 2) return 3;
+            if (infra >= 1 && attr >= 1) return 2;
+            return 1;
+        };
+
+        // --- Game State ---
+        let gameState = {
+            mode: 'ai', // ai, local, online
+            status: 'setup', // setup, lobby, playing, finished
+            players: [],
+            currentTurnIndex: 0,
+            actionsLeft: 3,
+            logs: [],
+            winner: null,
+            winnerReason: "",
+            triggerEndRound: false, 
+            triggerEndPlayerIdx: null 
+        };
+
+        // Firebase & Online State
+        let fbDb = null;
+        let fbAppId = null;
+        let myUid = null;
+        let currentRoomId = null;
+        let unsubscribeRooms = null;
+        let unsubscribeCurrentRoom = null;
+        let lobbyTimerInterval = null;
+        let botTimer = null;
+
+        // Ensure global API exists for inline HTML onclicks
+        window.gameAPI = window.gameAPI || {};
+
+        const showCustomAlert = (msg) => {
+            const alertBox = document.getElementById('custom-alert');
+            const alertText = document.getElementById('custom-alert-text');
+            alertText.innerText = msg;
+            alertBox.classList.remove('hidden');
+            setTimeout(() => {
+                alertBox.classList.add('hidden');
+            }, 5000);
+        };
+
+        const showScreen = (screenId) => {
+            ['screen-setup', 'screen-lobby', 'screen-game'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(screenId).classList.remove('hidden');
+        };
+
+        const renderApp = () => {
+            if (gameState.status === 'setup') {
+                showScreen('screen-setup');
+            } else if (gameState.status === 'lobby') {
+                showScreen('screen-lobby');
+            } else {
+                showScreen('screen-game');
+                updateGameBoard();
+            }
+        };
+
+        // Init Firebase
+const initFirebase = async () => {
+  try {
+    const firebaseConfig = {
+      apiKey: "AIzaSyC-Gkh739T9c1n_HNGo_5Ik4gLmlEk7Ao4",
+      authDomain: "worldmuseum-c8358.firebaseapp.com",
+      projectId: "worldmuseum-c8358",
+      storageBucket: "worldmuseum-c8358.firebasestorage.app",
+      messagingSenderId: "457517535059",
+      appId: "1:457517535059:web:e711942fe0f3297f8e9ba6",
+      measurementId: "G-KVQS6K5CB6"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    fbDb = getFirestore(app);
+
+    fbAppId = 'travel-scale-game-v1';
+
+    await signInAnonymously(auth);
+
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        myUid = user.uid;
+        console.log("登入成功，玩家 ID: ", myUid);
+        if (gameState.mode === 'online') {
+          listenToRooms();
+        }
+      }
+    });
+  } catch (e) {
+    console.error("Firebase 初始化失敗，請檢查金鑰是否填寫正確:", e);
+    showCustomAlert("無法連線至伺服器，請確認網路或資料庫設定。");
+  }
+};
+
+
+        // Listen to Room List
+        const listenToRooms = () => {
+            if (!myUid || !fbDb) return;
+            const roomsCollectionRef = collection(fbDb, 'artifacts', fbAppId, 'public', 'data', 'rooms');
+            
+            if (unsubscribeRooms) unsubscribeRooms();
+            
+            unsubscribeRooms = onSnapshot(roomsCollectionRef, (snapshot) => {
+                const roomsMap = {};
+                snapshot.forEach(doc => { roomsMap[doc.id] = doc.data(); });
+                
+                let roomsHTML = '';
+                for (let i = 1; i <= 6; i++) {
+                    const rId = `room_${i}`;
+                    const rData = roomsMap[rId];
+                    const pCount = rData && rData.players ? rData.players.length : 0;
+                    const isPlaying = rData && rData.status === 'playing';
+                    
+                    let btnClass = "border-2 rounded-xl p-3 text-left transition hover:shadow-md";
+                    let stateText = "";
+                    let canJoin = false;
+
+                    if (isPlaying) {
+                        btnClass += " border-slate-300 bg-slate-100 text-slate-400 cursor-not-allowed";
+                        stateText = "<span class='text-xs text-red-500 font-bold'>遊戲中</span>";
+                    } else if (pCount >= 4) {
+                        btnClass += " border-slate-300 bg-slate-100 text-slate-400 cursor-not-allowed";
+                        stateText = "<span class='text-xs text-red-500 font-bold'>已滿員</span>";
+                    } else {
+                        btnClass += " border-teal-200 bg-teal-50 hover:border-teal-400 hover:bg-teal-100 text-teal-800 cursor-pointer";
+                        stateText = "<span class='text-xs text-emerald-600 font-bold'>等待加入</span>";
+                        canJoin = true;
+                    }
+
+                    roomsHTML += `
+                        <button ${canJoin ? `onclick="window.gameAPI.joinOnlineRoom('${rId}')"` : 'disabled'} class="${btnClass}">
+                            <div class="font-black text-lg mb-1">房間 ${i}</div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-sm font-bold"><i class="fa-solid fa-users"></i> ${pCount}/4</span>
+                                ${stateText}
+                            </div>
+                        </button>
+                    `;
+                }
+                document.getElementById('rooms-grid').innerHTML = roomsHTML;
+            }, (error) => {
+                console.error("監聽房間列表失敗:", error);
+                document.getElementById('rooms-grid').innerHTML = `<div class="col-span-2 text-red-500 text-sm text-center">連線異常，無法獲取房間列表。</div>`;
+            });
+        };
+
+        const initStageInfo = () => {
+            document.getElementById('game-stage-info').innerHTML = Object.values(STAGES).map(s => `
+                <div class="flex justify-between items-center text-slate-300 bg-slate-900/50 p-2 rounded">
+                    <span class="font-medium">[${s.name}] <br> ${s.desc}</span>
+                    <span class="font-mono text-right flex flex-col items-end">
+                        <span class="text-yellow-400 font-bold">+${s.income} 資金</span>
+                        <span class="${s.pressure > 0 ? 'text-red-400' : 'text-emerald-400'}">+${s.pressure} 壓力</span>
+                    </span>
+                </div>
+            `).join('');
+        };
+        initStageInfo();
+
+        const updateGameBoard = () => {
+            document.getElementById('online-sync-alert').classList.toggle('hidden', gameState.mode !== 'online');
+
+            // Logs View
+            document.getElementById('game-logs').innerHTML = gameState.logs.map(log => {
+                let colorCls = 'border-slate-600 text-slate-300';
+                if (log.includes('💥')) colorCls = 'border-red-500 text-red-400 font-bold bg-red-900/10';
+                else if (log.includes('🎉')) colorCls = 'border-yellow-500 text-yellow-400 bg-yellow-900/10';
+                else if (log.includes('🛡️')) colorCls = 'border-green-500 text-green-400 bg-green-900/10';
+                else if (log.includes('⚔️') || log.includes('攻擊')) colorCls = 'border-orange-500 text-orange-400 bg-orange-900/10';
+                return `<div class="p-2 rounded border-l-4 bg-slate-900 ${colorCls}">${log}</div>`;
+            }).join('');
+
+            // Dashboard
+            document.getElementById('game-global-dashboard').innerHTML = `
+                <div class="text-teal-400 font-bold mr-2 flex items-center"><i class="fa-solid fa-users mr-2"></i>大亨狀態總覽：</div>
+                ${gameState.players.map(p => {
+                    const isBoomClose = p.pressure >= 120;
+                    const isRich = p.money >= 100;
+                    let styleCls = "border-slate-700 bg-slate-800";
+                    if (isBoomClose) styleCls = "border-red-500 bg-red-950/40 animate-pulse";
+                    else if (isRich) styleCls = "border-yellow-500 bg-yellow-950/20";
+                    
+                    return `
+                    <div class="flex items-center gap-3 px-4 py-2 rounded-lg border text-sm shadow-inner transition-all duration-300 ${styleCls}">
+                        <span class="font-bold text-slate-200">${p.name} ${gameState.mode === 'online' && p.uid === myUid ? '(你)' : ''}</span>
+                        <span class="text-yellow-400 font-bold bg-yellow-400/10 px-2 rounded">$${p.money}</span>
+                        <span class="font-bold px-2 rounded ${p.pressure >= PI_LIMIT ? 'bg-red-600 text-white animate-pulse' : (p.pressure >= 100 ? 'bg-orange-500 text-white animate-pulse' : (p.pressure >= 60 ? 'bg-yellow-500/20 text-yellow-500' : 'bg-slate-700 text-slate-300'))}">PI: ${p.pressure} / ${PI_LIMIT}</span>
+                    </div>
+                `}).join('')}
+            `;
+
+            // Winner Banner
+            const winnerBanner = document.getElementById('game-winner-banner');
+            if (gameState.status === 'finished') {
+                winnerBanner.classList.remove('hidden');
+                document.getElementById('game-winner-name').innerText = `勝出者：${gameState.winner}`;
+                document.getElementById('game-winner-reason').innerText = gameState.winnerReason;
+            } else {
+                winnerBanner.classList.add('hidden');
+            }
+
+            // Turn Indicator
+            if (gameState.status === 'playing') {
+                document.getElementById('game-turn-indicator').classList.remove('hidden');
+                const activePlayer = gameState.players[gameState.currentTurnIndex];
+                document.getElementById('game-active-player-name').innerText = activePlayer ? activePlayer.name : '';
+                
+                if (activePlayer && activePlayer.isBot) {
+                    document.getElementById('game-ai-thinking').classList.remove('hidden');
+                } else {
+                    document.getElementById('game-ai-thinking').classList.add('hidden');
+                }
+
+                if (gameState.triggerEndRound) {
+                    document.getElementById('game-last-round-indicator').classList.remove('hidden');
+                } else {
+                    document.getElementById('game-last-round-indicator').classList.add('hidden');
+                }
+
+                const myTurnAlert = document.getElementById('game-my-turn-alert');
+                const isMyOnlineTurn = gameState.mode === 'online' && activePlayer.uid === myUid;
+                const isMyLocalTurn = gameState.mode !== 'online' && !activePlayer.isBot;
+                
+                if (isMyOnlineTurn || isMyLocalTurn) {
+                    myTurnAlert.classList.remove('hidden');
+                    document.getElementById('game-actions-left').innerText = gameState.actionsLeft;
+                } else {
+                    myTurnAlert.classList.add('hidden');
+                }
+            } else {
+                document.getElementById('game-turn-indicator').classList.add('hidden');
+            }
+
+            // Players Grid
+            const getPressureColor = (val) => {
+                if (val < 60) return 'bg-emerald-500';
+                if (val < 100) return 'bg-amber-500';
+                if (val < PI_LIMIT) return 'bg-red-500';
+                return 'bg-red-700 animate-pulse';
+            };
+
+            document.getElementById('game-players-grid').innerHTML = gameState.players.map((p, idx) => {
+                const isActive = gameState.currentTurnIndex === idx && gameState.status === 'playing';
+                const stage = STAGES[p.stage];
+
+                const nextIncome = stage.income;
+                const nextPressure = stage.pressure;
+
+                let borderAnimationCls = 'border-slate-700 opacity-90';
+                if (p.pressure >= 120) {
+                    borderAnimationCls = 'animate-red-flash border-4';
+                } else if (p.money >= 100) {
+                    borderAnimationCls = 'animate-yellow-flash border-4';
+                } else if (isActive) {
+                    borderAnimationCls = 'border-teal-500 shadow-xl shadow-teal-900/50';
+                }
+
+                const moneySparkCls = p.money >= 100 ? 'text-yellow-400 animate-pulse scale-110 font-extrabold' : 'text-yellow-400';
+
+                const infraDots = [1,2,3,4,5].map(i => `<div class="h-8 flex-1 rounded ${i <= p.infraBuilt ? 'bg-blue-500' : 'bg-slate-800 border border-slate-600'}"></div>`).join('');
+                const attrDots = [1,2,3,4,5].map(i => `<div class="h-8 flex-1 rounded ${i <= p.attrBuilt ? 'bg-purple-500' : 'bg-slate-800 border border-slate-600'}"></div>`).join('');
+                
+                let humanControls = '';
+                const canControl = isActive && (gameState.mode === 'online' ? p.uid === myUid : !p.isBot);
+
+                if (canControl) {
+                    const drawLimitReached = p.drawCountThisTurn >= 3;
+                    const drawBtnClass = drawLimitReached ? 'bg-slate-700 text-slate-500 border-slate-600 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500 border-amber-500 text-white';
+                    
+                    const opponents = gameState.players
+                        .map((op, opIdx) => ({ ...op, roomSeatIndex: opIdx }))
+                        .filter(op => op.roomSeatIndex !== idx); 
+
+                    const attackOptions = opponents.map(op => 
+                        `<button onclick="window.gameAPI.actionChallenge(${op.roomSeatIndex})" class="bg-slate-600 hover:bg-red-500 text-white text-xs py-2 px-2 rounded border border-slate-500 w-full text-left transition"><i class="fa-solid fa-crosshairs text-red-400 mr-1"></i> 攻擊 ${op.name} (+20 PI)</button>`
+                    ).join('');
+
+                    humanControls = `
+                    <div class="mt-auto border-t border-slate-700 pt-4 space-y-2 relative z-20">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-2">
+                            <button onclick="window.gameAPI.actionDraw()" ${drawLimitReached ? 'disabled' : ''} class="col-span-2 py-2 rounded font-bold text-sm transition shadow flex items-center justify-center gap-1 border ${drawBtnClass}">
+                                <i class="fa-solid fa-credit-card"></i> ${drawLimitReached ? '已達抽卡上限 (3/3)' : `抽取行動卡 (已抽 ${p.drawCountThisTurn}/3)`}
+                            </button>
+                            <button onclick="window.gameAPI.actionInfra()" class="col-span-1 bg-blue-600 hover:bg-blue-500 py-2 rounded font-bold text-sm transition shadow text-white">建設基建</button>
+                            <button onclick="window.gameAPI.actionAttr()" class="col-span-1 bg-purple-600 hover:bg-purple-500 py-2 rounded font-bold text-sm transition shadow text-white">開發景點</button>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="window.gameAPI.actionPolicy()" class="bg-green-600 hover:bg-green-500 py-2 rounded font-bold text-sm transition shadow flex items-center justify-center gap-1 text-white"><i class="fa-solid fa-shield-halved"></i> 實施政策 (消卡,-20PI)</button>
+                            
+                            <div class="relative">
+                                <button onclick="document.getElementById('attack-menu-${p.id}-${idx}').classList.toggle('hidden')" class="w-full bg-red-600 hover:bg-red-500 py-2 rounded font-bold text-sm transition shadow flex items-center justify-center gap-1 text-white">
+                                    <i class="fa-solid fa-khanda"></i> 挑戰對手 <i class="fa-solid fa-caret-down ml-1"></i>
+                                </button>
+                                <div id="attack-menu-${p.id}-${idx}" class="absolute bottom-full mb-1 w-full hidden flex-col gap-1 bg-slate-700 p-2 rounded-lg shadow-xl z-30 border border-slate-600">
+                                    ${attackOptions || '<div class="text-xs text-slate-400 text-center py-1">無對手</div>'}
+                                </div>
+                            </div>
+                        </div>
+                        <button onclick="window.gameAPI.manuallyEndTurn()" class="w-full mt-2 bg-slate-600 hover:bg-slate-500 py-3 rounded font-bold transition shadow border border-slate-500 flex justify-center items-center gap-2 text-white">
+                            結束回合 <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                    </div>`;
+                }
+
+                return `
+                <div class="bg-slate-800 rounded-2xl border-4 p-5 flex flex-col relative transition-all duration-300 ${borderAnimationCls}">
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <h3 class="text-2xl font-black flex items-center gap-2">
+                                ${p.isBot ? '<i class="fa-solid fa-robot text-slate-400"></i>' : ''} ${p.name} 
+                                ${isActive ? '<span class="text-xs bg-teal-700 text-white px-2 py-1 rounded-full animate-pulse">執行中</span>' : ''}
+                                ${gameState.mode === 'online' && p.uid === myUid ? '<span class="text-xs bg-blue-600 text-white px-2 py-1 rounded-lg">我</span>' : ''}
+                            </h3>
+                            <p class="text-slate-400 font-medium">${stage.name} | 旅客: ${stage.desc}</p>
+                        </div>
+                        <div class="text-right">
+                            <div class="text-3xl font-black mb-1 transition-all duration-300 ${moneySparkCls}">$${p.money}</div>
+                        </div>
+                    </div>
+
+                    <div class="mb-4 bg-slate-900/60 rounded-xl px-3 py-2 border border-slate-700/60 text-xs text-slate-300 flex items-center justify-between gap-2">
+                        <span class="font-medium text-slate-400"><i class="fa-solid fa-clock-rotate-left mr-1 text-teal-400"></i> 下回合預期：</span>
+                        <div class="flex items-center gap-3">
+                            <span class="font-bold text-yellow-400">+$${nextIncome} 資金</span>
+                            <span class="text-slate-500">|</span>
+                            <span class="font-bold ${nextPressure > 0 ? 'text-red-400' : 'text-emerald-400'}">+${nextPressure} PI 壓力</span>
+                        </div>
+                    </div>
+
+                    <div class="mb-6 bg-slate-900 p-3 rounded-xl border border-slate-700 relative overflow-hidden">
+                        <div class="flex justify-between text-sm font-bold mb-1 relative z-10">
+                            <span>社會與環境壓力 (PI)</span>
+                            <span class="${p.pressure >= 100 ? 'text-red-400 font-bold' : 'text-slate-300'}">${p.pressure} / ${PI_LIMIT}</span>
+                        </div>
+                        <div class="w-full bg-slate-700 rounded-full h-3 overflow-hidden relative z-10">
+                            <div class="h-full transition-all duration-500 ${getPressureColor(p.pressure)}" style="width: ${Math.min(100, (p.pressure / PI_LIMIT) * 100)}%"></div>
+                        </div>
+                        ${p.pressure >= 100 ? '<div class="absolute inset-0 bg-red-900/20 animate-pulse"></div>' : ''}
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="bg-slate-700/30 p-3 rounded-lg border border-slate-600">
+                            <div class="text-slate-400 text-sm font-bold mb-2 flex items-center gap-1"><i class="fa-solid fa-building"></i> 基礎建設 (${p.infraBuilt}/5)</div>
+                            <div class="flex gap-1">${infraDots}</div>
+                        </div>
+                        <div class="bg-slate-700/30 p-3 rounded-lg border border-slate-600">
+                            <div class="text-slate-400 text-sm font-bold mb-2 flex items-center gap-1"><i class="fa-solid fa-map-location-dot"></i> 旅遊景點 (${p.attrBuilt}/5)</div>
+                            <div class="flex gap-1">${attrDots}</div>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-4 mb-4">
+                        <div class="flex-1 bg-slate-700/50 rounded-lg p-2 text-center text-sm font-bold text-slate-300 flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-shield-halved ${p.policyCards > 0 ? 'text-green-400' : 'text-slate-500'}"></i> 政策卡 x ${p.policyCards}
+                        </div>
+                        <div class="flex-1 bg-slate-700/50 rounded-lg p-2 text-center text-sm font-bold text-slate-300 flex justify-center items-center gap-2">
+                            <i class="fa-solid fa-khanda ${p.challengeCards > 0 ? 'text-red-400' : 'text-slate-500'}"></i> 挑戰卡 x ${p.challengeCards}
+                        </div>
+                    </div>
+
+                    ${humanControls}
+                    ${(!isActive && gameState.status === 'playing') ? '<div class="absolute inset-0 bg-slate-900/40 rounded-2xl pointer-events-none z-10"></div>' : ''}
+                </div>
+                `;
+            }).join('');
+        };
+
+        const addLog = (prevLogs, msg) => {
+            const newLog = `[${new Date().toLocaleTimeString('zh-HK', {hour12:false})}] ${msg}`;
+            return [newLog, ...prevLogs].slice(0, 20);
+        };
+
+        const handleBoom = (player) => {
+            let p = { ...player };
+            const isRejuvenation = Math.random() > 0.5;
+            let logMsg = `💥 警告！${p.name} 壓力爆煲 (${p.pressure} PI)！`;
+            if (isRejuvenation) {
+                p.money = Math.floor(p.money / 2);
+                p.pressure = 0;
+                logMsg += `【🔄 重生】成功轉型！扣除 50% 資金 (剩 $${p.money})，PI壓力清零！`;
+            } else {
+                p.money = 0;
+                p.infraBuilt = Math.max(0, p.infraBuilt - 1);
+                p.attrBuilt = Math.max(0, p.attrBuilt - 1);
+                p.pressure = 50;
+                p.stage = getCalculatedStage(p.infraBuilt, p.attrBuilt);
+                logMsg += `【📉 衰落】旅遊業崩潰！資金歸零，強制拆除建築各級-1，PI壓力退回 50。`;
+            }
+            return { player: p, log: logMsg };
+        };
+
+        // --- Core Turn Engine ---
+        const triggerTurnStart = (players, turnIndex, currentLogs) => {
+            let updatedPlayers = JSON.parse(JSON.stringify(players));
+            let activePlayer = updatedPlayers[turnIndex];
+            let logs = [...currentLogs];
+
+            if (gameState.triggerEndRound && turnIndex === gameState.triggerEndPlayerIdx) {
+                concludeGame(updatedPlayers, logs);
+                return;
+            }
+
+            logs = addLog(logs, `--- ${activePlayer.name} 的回合開始 ---`);
+            const stageInfo = STAGES[activePlayer.stage];
+            activePlayer.money += stageInfo.income;
+            activePlayer.pressure += stageInfo.pressure;
+            logs = addLog(logs, `[系統派客] 接待 ${stageInfo.desc}，獲得 $${stageInfo.income}，壓力 +${stageInfo.pressure}`);
+
+            activePlayer.drawCountThisTurn = 0;
+
+            gameState.players = updatedPlayers;
+            gameState.logs = logs;
+            gameState.actionsLeft = 3;
+            gameState.currentTurnIndex = turnIndex;
+
+            renderApp();
+
+            if (activePlayer.isBot && gameState.status === 'playing' && gameState.mode !== 'online') {
+                clearTimeout(botTimer);
+                botTimer = setTimeout(() => executeLocalBotTurn(), 1200);
+            }
+        };
+
+        const nextTurn = (players, currentIndex, currentLogs) => {
+            const nextIdx = (currentIndex + 1) % players.length;
+            triggerTurnStart(players, nextIdx, currentLogs);
+        };
+
+        // Local Mode Bot
+        const executeLocalBotTurn = () => {
+            if (gameState.status !== 'playing') return;
+            const res = simulateFullBotTurn(gameState.players[gameState.currentTurnIndex], gameState.players, gameState.logs);
+            
+            gameState.players = res.players;
+            gameState.logs = res.logs;
+            
+            if (res.newEndRound) {
+                gameState.triggerEndRound = true;
+                gameState.triggerEndPlayerIdx = gameState.currentTurnIndex;
+            }
+
+            renderApp();
+            setTimeout(() => nextTurn(gameState.players, gameState.currentTurnIndex, gameState.logs), 1500);
+        };
+
+        // Online Sync Mechanism
+        const syncOnlineAction = async (newPlayers, newLogs) => {
+            if (!fbDb || !currentRoomId) return;
+            try {
+                const roomRef = doc(fbDb, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId);
+                await updateDoc(roomRef, {
+                    players: newPlayers,
+                    logs: newLogs,
+                    actionsLeft: gameState.actionsLeft,
+                    triggerEndRound: gameState.triggerEndRound,
+                    triggerEndPlayerIdx: gameState.triggerEndPlayerIdx
+                });
+            } catch (error) {
+                console.error("Sync error:", error);
+                showCustomAlert("網路同步失敗");
+            }
+        };
+
+     const executePlayerAction = async (actionFn) => {
+  if (gameState.status !== 'playing') return;
+  if (gameState.mode === 'online') {
+    const active = gameState.players[gameState.currentTurnIndex];
+    if (!active || active.uid !== myUid) return;
+  }
+  if (gameState.actionsLeft <= 0) return showCustomAlert('本回合行動點已耗盡！請點擊結束回合');
+
+  // ✅ 把原來在 ... 之後的程式碼直接放在這裡
+  let updatedPlayers = JSON.parse(JSON.stringify(gameState.players));
+  let myPlayer = updatedPlayers[gameState.currentTurnIndex];
+  let logs = [...gameState.logs];
+
+  const result = actionFn(myPlayer, updatedPlayers, logs);
+  if (!result.success) return showCustomAlert(result.error);
+
+  updatedPlayers = result.players;
+  logs = addLog(result.logs, result.logMsg);
+  gameState.actionsLeft--;
+
+  if (gameState.mode === 'online') {
+    gameState.players = updatedPlayers;
+    await syncOnlineAction(updatedPlayers, logs);
+  } else {
+    gameState.players = updatedPlayers;
+    gameState.logs = logs;
+    renderApp();
+  }
+}; // 這裡才正確閉合函式
+
+        // Shared Bot Logic
+        const simulateFullBotTurn = (botPlayer, allPlayers, currentLogs) => {
+            let b = { ...botPlayer };
+            let players = JSON.parse(JSON.stringify(allPlayers));
+            let logs = [...currentLogs];
+            let actionsDone = 0;
+
+            logs = addLog(logs, `🤖 ${b.name} 正在思考策略...`);
+
+            while (b.drawCountThisTurn < 3 && (b.policyCards + b.challengeCards < 3) && actionsDone < 3) {
+                const isPolicy = Math.random() > 0.5;
+                if (isPolicy) b.policyCards++; else b.challengeCards++;
+                b.drawCountThisTurn++;
+                logs = addLog(logs, `🃏 ${b.name} 消耗 1 行動點抽卡 (本回合已抽: ${b.drawCountThisTurn}/3)。`);
+                actionsDone++;
+            }
+            if (b.pressure >= 100 && b.policyCards > 0 && actionsDone < 3) {
+                b.policyCards--;
+                b.pressure = Math.max(0, b.pressure - 20);
+                logs = addLog(logs, `🛡️ ${b.name} 實施政策，緊急消減承載力壓力 (-20 PI)。`);
+                actionsDone++;
+            }
+            if (b.infraBuilt < 5 && actionsDone < 3) {
+                b.infraBuilt++;
+                logs = addLog(logs, `🏗️ ${b.name} 建設了 1 個基礎建設。`);
+                actionsDone++;
+            }
+            if (b.attrBuilt < 5 && actionsDone < 3) {
+                b.attrBuilt++;
+                logs = addLog(logs, `🎢 ${b.name} 開發了 1 個旅遊景點。`);
+                actionsDone++;
+            }
+            if (b.challengeCards > 0 && actionsDone < 3) {
+                const opponents = players.filter(p => p.id !== b.id);
+                if (opponents.length > 0) {
+                    const randomOpponent = opponents[Math.floor(Math.random() * opponents.length)];
+                    const targetIndex = players.findIndex(p => p.id === randomOpponent.id);
+                    players[targetIndex].pressure += 20;
+                    b.challengeCards--;
+                    logs = addLog(logs, `⚔️ ${b.name} 對 ${randomOpponent.name} 發起挑戰，使其 PI +20！`);
+                    actionsDone++;
+                }
+            }
+
+            b.stage = getCalculatedStage(b.infraBuilt, b.attrBuilt);
+            const myIndex = players.findIndex(p => p.id === b.id);
+            players[myIndex] = b;
+
+            let newEndRound = false;
+            if (b.pressure >= PI_LIMIT) {
+                const boomResult = handleBoom(b);
+                players[myIndex] = boomResult.player;
+                logs = addLog(logs, boomResult.log);
+            } else {
+                if (b.money >= 150 && !gameState.triggerEndRound) {
+                    newEndRound = true;
+                    logs = addLog(logs, `🚨 【終局提示】${b.name} 成功賺得 $${b.money} (且未爆煲)！觸發「最後一輪」！其餘玩家有最後一回合可以反擊！`);
+                }
+            }
+            return { players, logs, newEndRound };
+        };
+
+        const concludeGame = (players, logs) => {
+            const qualified = players.filter(p => p.pressure < PI_LIMIT && p.money >= 150);
+            
+            if (qualified.length === 0) {
+                gameState.triggerEndRound = false;
+                gameState.triggerEndPlayerIdx = null;
+                logs = addLog(logs, `⚠️ 終局大轉折！在最後一輪中，所有原本滿 $150 的玩家都爆煲或失格了！終局警報解除，競賽繼續！`);
+                gameState.players = players;
+                gameState.logs = logs;
+                if(gameState.mode === 'online') {
+                    syncOnlineAction(players, logs); // Revert state in DB
+                    advanceOnlineTurn(players, logs); // Continue
+                } else {
+                    renderApp();
+                    nextTurn(players, gameState.currentTurnIndex, logs);
+                }
+                return;
+            }
+
+            qualified.sort((a, b) => {
+                if (b.money !== a.money) return b.money - a.money;
+                return a.pressure - b.pressure;
+            });
+
+            const finalWinner = qualified[0];
+            gameState.status = 'finished';
+            gameState.winner = finalWinner.name;
+            
+            let winReason = `結算總理財金額為 $${finalWinner.money} 且 PI 壓力僅為 ${finalWinner.pressure}，為最可持續發展的旅遊天秤大亨！`;
+            gameState.winnerReason = winReason;
+            logs = addLog(logs, `🎉 🎉 🎉 遊戲宣告結束！大贏家是：${finalWinner.name}！(${winReason})`);
+            
+            gameState.players = players;
+            gameState.logs = logs;
+
+            if(gameState.mode === 'online' && fbDb) {
+                const roomRef = doc(fbDb, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId);
+                updateDoc(roomRef, { status: 'finished', winner: finalWinner.name, winnerReason: winReason, logs: logs });
+            }
+
+            renderApp();
+        };
+
+        // --- Online Specific ---
+        const advanceOnlineTurn = async (players, logs) => {
+            const nextIdx = (gameState.currentTurnIndex + 1) % players.length;
+            
+            if (gameState.triggerEndRound && nextIdx === gameState.triggerEndPlayerIdx) {
+                concludeGame(players, logs);
+                return;
+            }
+
+            let nextPlayer = players[nextIdx];
+            logs = addLog(logs, `--- ${nextPlayer.name} 的回合開始 ---`);
+            const stageInfo = STAGES[nextPlayer.stage];
+            nextPlayer.money += stageInfo.income;
+            nextPlayer.pressure += stageInfo.pressure;
+            logs = addLog(logs, `[系統派客] 接待 ${stageInfo.desc}，獲得 $${stageInfo.income}，壓力 +${stageInfo.pressure}`);
+            nextPlayer.drawCountThisTurn = 0;
+
+            const roomRef = doc(fbDb, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId);
+            await updateDoc(roomRef, {
+                players: players,
+                logs: logs,
+                currentTurnIndex: nextIdx,
+                actionsLeft: 3
+            });
+        };
+
+        // Global API 
+    window.gameAPI.setMode = (mode) => {
+    gameState.mode = mode;
+    if (mode === 'online') {
+        initFirebase();
+    }
+
+    // ▼ 以下原本在外面，現在移進來 ▼
+    document.getElementById('tab-ai').className = "flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-transparent text-slate-500 hover:text-slate-700 transition";
+    document.getElementById('tab-local').className = "flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-transparent text-slate-500 hover:text-slate-700 transition";
+    document.getElementById('tab-online').className = "flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-transparent text-slate-500 hover:text-slate-700 transition relative";
+    document.getElementById('tab-' + mode).className = "flex-1 py-3 text-center font-bold text-sm md:text-lg border-b-4 border-teal-600 text-teal-700 transition" + (mode === 'online' ? ' relative' : '');
+
+    const isOnline = mode === 'online';
+    document.getElementById('online-rooms-container').classList.toggle('hidden', !isOnline);
+    document.getElementById('btn-start-local').classList.toggle('hidden', isOnline);
+    document.getElementById('rule-online-extra').classList.toggle('hidden', !isOnline);
+    document.getElementById('p2-container').classList.toggle('hidden', isOnline);
+    document.getElementById('p3-container').classList.toggle('hidden', isOnline);
+    document.getElementById('p4-container').classList.toggle('hidden', isOnline);
+    document.getElementById('player-input-title').innerText = isOnline ? '準備線上連線：' : '輸入玩家名字：';
+
+    const p2Name = document.getElementById('p2-name');
+    const p3Name = document.getElementById('p3-name');
+    const p4Name = document.getElementById('p4-name');
+    if (mode === 'ai') {
+        p2Name.value = "AI局長 1號"; p2Name.disabled = true; p2Name.className = "w-full border-2 border-slate-100 bg-slate-50 text-slate-400 rounded-lg px-4 py-2 font-medium";
+        p3Name.value = "AI局長 2號"; p3Name.disabled = true; p3Name.className = "w-full border-2 border-slate-100 bg-slate-50 text-slate-400 rounded-lg px-4 py-2 font-medium";
+        p4Name.value = "AI局長 3號"; p4Name.disabled = true; p4Name.className = "w-full border-2 border-slate-100 bg-slate-50 text-slate-400 rounded-lg px-4 py-2 font-medium";
+    } else if (mode === 'local') {
+        p2Name.value = "玩家 B"; p2Name.disabled = false; p2Name.className = "w-full border-2 border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500 font-medium";
+        p3Name.value = "玩家 C"; p3Name.disabled = false; p3Name.className = "w-full border-2 border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500 font-medium";
+        p4Name.value = "玩家 D"; p4Name.disabled = false; p4Name.className = "w-full border-2 border-slate-200 rounded-lg px-4 py-2 focus:outline-none focus:border-teal-500 font-medium";
+    }
+    if (isOnline && !myUid) {
+        listenToRooms();
+    }
+
+    renderApp();   
+};
+
+
+        window.gameAPI.startGame = () => {
+            if (gameState.mode === 'online') return; // Handled by Join Room
+
+            const name1 = document.getElementById('p1-name').value.trim() || '玩家 A';
+            const name2 = document.getElementById('p2-name').value.trim() || '玩家 B';
+            const name3 = document.getElementById('p3-name').value.trim() || '玩家 C';
+            const name4 = document.getElementById('p4-name').value.trim() || '玩家 D';
+            const isAiMode = gameState.mode === 'ai';
+
+            gameState.players = [
+                { id: 'p1', uid: 'local1', name: name1, money: 0, pressure: 0, infraBuilt: 0, attrBuilt: 0, stage: 1, policyCards: 0, challengeCards: 0, drawCountThisTurn: 0, isBot: false },
+                { id: 'p2', uid: 'local2', name: name2, money: 0, pressure: 0, infraBuilt: 0, attrBuilt: 0, stage: 1, policyCards: 0, challengeCards: 0, drawCountThisTurn: 0, isBot: isAiMode },
+                { id: 'p3', uid: 'local3', name: name3, money: 0, pressure: 0, infraBuilt: 0, attrBuilt: 0, stage: 1, policyCards: 0, challengeCards: 0, drawCountThisTurn: 0, isBot: isAiMode },
+                { id: 'p4', uid: 'local4', name: name4, money: 0, pressure: 0, infraBuilt: 0, attrBuilt: 0, stage: 1, policyCards: 0, challengeCards: 0, drawCountThisTurn: 0, isBot: isAiMode }
+            ];
+
+            gameState.status = 'playing';
+            gameState.currentTurnIndex = 0;
+            gameState.logs = addLog([], '🎉 旅遊天秤 模擬競賽正式開始！所有開發者由 $0 啟動資金起跑。');
+            gameState.triggerEndRound = false;
+            gameState.triggerEndPlayerIdx = null;
+
+            renderApp();
+            triggerTurnStart(gameState.players, 0, gameState.logs);
+        };
+
+        window.gameAPI.joinOnlineRoom = async (roomId) => {
+            if (!myUid || !fbDb) return showCustomAlert("伺服器未連線");
+            
+            const myName = document.getElementById('p1-name').value.trim() || '玩家 A';
+            const roomRef = doc(fbDb, 'artifacts', fbAppId, 'public', 'data', 'rooms', roomId);
+
+            try {
+                await runTransaction(fbDb, async (transaction) => {
+                    const roomDoc = await transaction.get(roomRef);
+                    const newPlayer = {
+                        id: `p_${myUid}`, uid: myUid, name: myName, money: 0, pressure: 0, 
+                        infraBuilt: 0, attrBuilt: 0, stage: 1, policyCards: 0, challengeCards: 0, 
+                        drawCountThisTurn: 0, isBot: false
+                    };
+
+                    if (!roomDoc.exists()) {
+                        transaction.set(roomRef, {
+                            status: 'waiting',
+                            players: [newPlayer],
+                            startedAt: Date.now(),
+                            logs: [],
+                            currentTurnIndex: 0,
+                            actionsLeft: 3,
+                            triggerEndRound: false,
+                            triggerEndPlayerIdx: null
+                        });
+                    } else {
+                        const data = roomDoc.data();
+                        if (data.status !== 'waiting') throw "房間已在遊戲中";
+                        if (data.players.length >= 4) throw "房間已滿員";
+                        if (data.players.find(p => p.uid === myUid)) throw "您已經在房間內";
+                        
+                        let updatedPlayers = [...data.players, newPlayer];
+                        let updates = { players: updatedPlayers };
+                        
+                        if (updatedPlayers.length === 4) {
+                            updates.status = 'playing';
+                            updates.logs = addLog([], '🎉 所有玩家已準備就緒，線上競賽正式開始！');
+                        }
+                        transaction.update(roomRef, updates);
+                    }
+                });
+
+                currentRoomId = roomId;
+                gameState.status = 'lobby';
+                document.getElementById('lobby-room-id').innerText = roomId.toUpperCase();
+                renderApp();
+
+                // Listen to specific room
+                if (unsubscribeCurrentRoom) unsubscribeCurrentRoom();
+                unsubscribeCurrentRoom = onSnapshot(roomRef, (doc) => {
+                    if (doc.exists()) {
+                        const rData = doc.data();
+                        handleOnlineRoomUpdate(rData);
+                    }
+                });
+
+            } catch (err) {
+                showCustomAlert(typeof err === 'string' ? err : "無法加入房間");
+                console.error(err);
+            }
+        };
+
+        const handleOnlineRoomUpdate = (rData) => {
+            // Check if game started
+            if (rData.status === 'playing' || rData.status === 'finished') {
+                if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
+                gameState = { ...gameState, ...rData };
+                
+                // If it just started, apply first turn income ONLY if not already in logs
+                if (gameState.logs.length === 1 && gameState.currentTurnIndex === 0 && rData.players[0].money === 0 && rData.players[0].pressure === 0) {
+                     // Host initializes first turn data
+                     if (rData.players[0].uid === myUid) advanceOnlineTurn(rData.players, rData.logs);
+                }
+
+                renderApp();
+
+                // Host handles Bot turns
+                const activePlayer = gameState.players[gameState.currentTurnIndex];
+                if (activePlayer && activePlayer.isBot && gameState.status === 'playing' && gameState.players[0].uid === myUid) {
+                    clearTimeout(botTimer);
+                    botTimer = setTimeout(async () => {
+                        const res = simulateFullBotTurn(activePlayer, gameState.players, gameState.logs);
+                        if (res.newEndRound) {
+                            gameState.triggerEndRound = true;
+                            gameState.triggerEndPlayerIdx = gameState.currentTurnIndex;
+                        }
+                        await syncOnlineAction(res.players, res.logs); // Sync bot changes
+                        advanceOnlineTurn(res.players, res.logs); // Advance to next player
+                    }, 2000);
+                }
+            } else if (rData.status === 'waiting') {
+                // Update Lobby UI
+                const pList = document.getElementById('lobby-players-list');
+                pList.innerHTML = rData.players.map((p, i) => `
+                    <div class="flex items-center gap-3 bg-slate-100 p-3 rounded border border-slate-200">
+                        <div class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">${i+1}</div>
+                        <span class="font-bold text-slate-700">${p.name} ${p.uid === myUid ? '<span class="text-xs text-blue-500">(你)</span>' : ''} ${i===0 ? '<i class="fa-solid fa-crown text-yellow-500 ml-1"></i>' : ''}</span>
+                    </div>
+                `).join('');
+
+                // Manage 30s Countdown
+                if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
+                lobbyTimerInterval = setInterval(() => {
+                    const elapsed = Date.now() - rData.startedAt;
+                    const rem = Math.max(0, 30 - Math.floor(elapsed/1000));
+                    document.getElementById('lobby-timer').innerText = `${rem} 秒`;
+                    
+                    if (rem <= 0) {
+                        clearInterval(lobbyTimerInterval);
+                        if (rData.players.length > 0 && rData.players[0].uid === myUid) {
+                            startOnlineGameWithBots(rData);
+                        }
+                    }
+                }, 1000);
+            }
+        };
+
+        const startOnlineGameWithBots = async (rData) => {
+            if (!fbDb || !currentRoomId) return;
+            const roomRef = doc(fbDb, 'artifacts', fbAppId, 'public', 'data', 'rooms', currentRoomId);
+            let pArr = [...rData.players];
+            let bCount = 1;
+            while (pArr.length < 4) {
+                pArr.push({
+                    id: `bot_${bCount}`, uid: `bot_${bCount}`, name: `AI局長 ${bCount}號`, 
+                    money: 0, pressure: 0, infraBuilt: 0, attrBuilt: 0, stage: 1, 
+                    policyCards: 0, challengeCards: 0, drawCountThisTurn: 0, isBot: true
+                });
+                bCount++;
+            }
+            await updateDoc(roomRef, {
+                status: 'playing',
+                players: pArr,
+                logs: addLog([], '🎉 倒數結束！AI 局長已加入填補空缺，線上競賽正式開始！')
+            });
+        };
+
+        window.gameAPI.leaveRoom = () => {
+            if (unsubscribeCurrentRoom) unsubscribeCurrentRoom();
+            if (lobbyTimerInterval) clearInterval(lobbyTimerInterval);
+            currentRoomId = null;
+            gameState.status = 'setup';
+            renderApp();
+            // Optional: If host leaves, we could delete room or transfer host, 
+            // for simplicity we just let users leave their own UI.
+        };
+
+        window.gameAPI.exitToSetup = () => {
+            clearTimeout(botTimer);
+            if (unsubscribeCurrentRoom) unsubscribeCurrentRoom();
+            currentRoomId = null;
+            gameState.status = 'setup';
+            renderApp();
+        };
+
+        // --- Actions ---
+        window.gameAPI.actionDraw = () => {
+            executePlayerAction((my, players, logs) => {
+                if (my.drawCountThisTurn >= 3) return { success: false, error: '本回合您的抽卡次數已達上限 (最多3次)！' };
+                const isPolicy = Math.random() > 0.5;
+                if (isPolicy) my.policyCards++; else my.challengeCards++;
+                my.drawCountThisTurn++;
+                const cardName = isPolicy ? '政策卡' : '挑戰卡';
+                
+                const myIdx = players.findIndex(p => p.id === my.id);
+                players[myIdx] = my;
+                return { success: true, players, logs, logMsg: `🃏 ${my.name} 消耗 1 點行動抽卡，獲得了 1 張【${cardName}】。` };
+            });
+        };
+
+        window.gameAPI.actionInfra = () => {
+            executePlayerAction((my, players, logs) => {
+                if (my.infraBuilt >= 5) return { success: false, error: '基礎建設已達上限 (5 級)！' };
+                my.infraBuilt++;
+                my.stage = getCalculatedStage(my.infraBuilt, my.attrBuilt);
+                const myIdx = players.findIndex(p => p.id === my.id);
+                players[myIdx] = my;
+                return { success: true, players, logs, logMsg: `🏗️ ${my.name} 成功建設 1 級基礎建設，目的地發展階段提升！` };
+            });
+        };
+
+        window.gameAPI.actionAttr = () => {
+            executePlayerAction((my, players, logs) => {
+                if (my.attrBuilt >= 5) return { success: false, error: '旅遊景點已達上限 (5 級)！' };
+                my.attrBuilt++;
+                my.stage = getCalculatedStage(my.infraBuilt, my.attrBuilt);
+                const myIdx = players.findIndex(p => p.id === my.id);
+                players[myIdx] = my;
+                return { success: true, players, logs, logMsg: `🎢 ${my.name} 成功開發 1 個景點，旅客吸引力增強！` };
+            });
+        };
+
+        window.gameAPI.actionPolicy = () => {
+            executePlayerAction((my, players, logs) => {
+                if (my.policyCards <= 0) return { success: false, error: '您手頭上沒有政策卡！請先抽卡。' };
+                my.policyCards--;
+                my.pressure = Math.max(0, my.pressure - 20);
+                const myIdx = players.findIndex(p => p.id === my.id);
+                players[myIdx] = my;
+                return { success: true, players, logs, logMsg: `🛡️ ${my.name} 使用【政策卡】，環境壓力 PI 大幅消減 -20 點！` };
+            });
+        };
+
+        window.gameAPI.actionChallenge = (targetIndex) => {
+            executePlayerAction((my, players, logs) => {
+                if (my.challengeCards <= 0) return { success: false, error: '您手頭上沒有挑戰卡！請先抽卡。' };
+                const target = players[targetIndex];
+                if (!target) return { success: false, error: '目標對手無效' };
+                my.challengeCards--;
+                target.pressure += 20;
+                const myIdx = players.findIndex(p => p.id === my.id);
+                players[myIdx] = my;
+                players[targetIndex] = target;
+                return { success: true, players, logs, logMsg: `⚔️ ${my.name} 使用了【挑戰卡】！將遊客引流至 ${target.name}，使其 PI 壓力暴增 +20 點！` };
+            });
+        };
+
+        window.gameAPI.manuallyEndTurn = () => {
+            if (gameState.status !== 'playing') return;
+            let updatedPlayers = JSON.parse(JSON.stringify(gameState.players));
+            let logs = [...gameState.logs];
+            let my = updatedPlayers[gameState.currentTurnIndex];
+
+            if (my.pressure >= PI_LIMIT) {
+                const boomResult = handleBoom(my);
+                updatedPlayers[gameState.currentTurnIndex] = boomResult.player;
+                logs = addLog(logs, boomResult.log);
+            } else {
+                if (my.money >= 150 && !gameState.triggerEndRound) {
+                    gameState.triggerEndRound = true;
+                    gameState.triggerEndPlayerIdx = gameState.currentTurnIndex;
+                    logs = addLog(logs, `🚨 【終局提示】${my.name} 賺取了 $${my.money}！已安全跨越終點線，終局整輪反擊戰開跑！其餘玩家仍有最後一回合！`);
+                }
+            }
+
+            gameState.players = updatedPlayers;
+            gameState.logs = logs;
+
+            if (gameState.mode === 'online') {
+                syncOnlineAction(updatedPlayers, logs); 
+                advanceOnlineTurn(updatedPlayers, logs);
+            } else {
+                renderApp();
+                nextTurn(updatedPlayers, gameState.currentTurnIndex, logs);
+            }
+        };
+
+        // Initialize Screen on load
+            renderApp();
+            initFirebase(); // Background Auth & Fetch
+        
+    </script>
+</body>
+</html>
